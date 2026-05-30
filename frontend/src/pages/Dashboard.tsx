@@ -1,38 +1,26 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { fetchDevices } from '../api/devices'
 import { systemInfo } from '../api/system'
-import { Monitor, Wifi, ShieldOff, AlertTriangle, TrendingUp } from 'lucide-react'
 import NetworkMap from '../components/network-map/NetworkMap'
-import { Link } from 'react-router-dom'
+import DeviceCard from '../components/devices/DeviceCard'
+import { useWsStatus } from '../hooks/useWebSocket'
 
-interface StatCardProps {
-  label: string
-  value: number
-  icon: React.ReactNode
-  gradient: string
-  href?: string
-}
-
-function StatCard({ label, value, icon, gradient, href }: StatCardProps) {
-  const content = (
-    <div
-      className="relative overflow-hidden rounded-xl p-5 transition-transform hover:scale-[1.01] cursor-default"
-      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-    >
-      {/* Gradient background glow */}
-      <div className={`absolute inset-0 opacity-[0.06] ${gradient}`} />
-      <div className="relative flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">{label}</p>
-          <p className="text-3xl font-bold text-white">{value}</p>
-        </div>
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${gradient} bg-opacity-20`}>
-          {icon}
-        </div>
+/* A single stat tile — flat, monospace, one accent. No gradients, no icon box. */
+function Stat({ label, value, accent, href }: {
+  label: string; value: number; accent: string; href?: string
+}) {
+  const body = (
+    <div className="rounded-[10px] border border-term-border bg-term-bg-2 px-4 py-3.5
+                    transition-colors duration-150 hover:border-term-border-strong">
+      <div className="flex items-center gap-2">
+        <span className={`dot ${accent}`} />
+        <span className="text-[11px] uppercase tracking-wider text-term-text-dim">{label}</span>
       </div>
+      <p className="mt-2 text-3xl font-semibold tabular-nums text-term-fg">{value}</p>
     </div>
   )
-  return href ? <Link to={href} className="block">{content}</Link> : content
+  return href ? <Link to={href} className="block">{body}</Link> : body
 }
 
 export default function Dashboard() {
@@ -40,62 +28,58 @@ export default function Dashboard() {
     queryKey: ['devices'],
     queryFn: () => fetchDevices(),
     staleTime: 10_000,
-    // No polling — WebSocket events invalidate this query in real-time
   })
-
   const { data: netInfo } = useQuery({
-    queryKey: ['system-info'],
-    queryFn: systemInfo,
-    staleTime: 60_000,
+    queryKey: ['system-info'], queryFn: systemInfo, staleTime: 60_000,
   })
+  const wsStatus = useWsStatus()
 
   const devices = data?.devices ?? []
-  const onlineCount  = devices.filter((d) => d.is_online).length
+  const onlineCount = devices.filter((d) => d.is_online).length
   const blockedCount = devices.filter((d) => d.is_blocked).length
-  const totalCount   = devices.length
   const protectedCount = devices.filter((d) => d.is_protected).length
+  const totalCount = devices.length
+
+  // Most interesting first: blocked, then online, then the rest.
+  const recent = [...devices]
+    .sort((a, b) =>
+      Number(b.is_blocked) - Number(a.is_blocked) || Number(b.is_online) - Number(a.is_online))
+    .slice(0, 8)
 
   return (
-    <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label="Online"
-          value={onlineCount}
-          icon={<Wifi size={20} className="text-emerald-400" />}
-          gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
-          href="/devices"
-        />
-        <StatCard
-          label="Total Devices"
-          value={totalCount}
-          icon={<Monitor size={20} className="text-blue-400" />}
-          gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
-          href="/devices"
-        />
-        <StatCard
-          label="Blocked"
-          value={blockedCount}
-          icon={<ShieldOff size={20} className="text-rose-400" />}
-          gradient="bg-gradient-to-br from-rose-500 to-red-600"
-        />
-        <StatCard
-          label="Protected"
-          value={protectedCount}
-          icon={<AlertTriangle size={20} className="text-amber-400" />}
-          gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-        />
+    <div className="mx-auto max-w-6xl space-y-5">
+      {/* Header — shell prompt vibe, clean */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg text-term-fg">
+            <span className="text-term-green">root@roost</span>
+            <span className="text-term-text-dim">:~$ </span>
+            overview
+          </h1>
+          <p className="mt-0.5 text-xs text-term-text-dim">
+            {netInfo?.gateway_ip ? `network ${netInfo.gateway_ip}` : 'scanning network…'}
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-2 text-xs text-term-text-dim">
+          <span className={`dot ${wsStatus === 'connected' ? 'dot-online pulse' : wsStatus === 'connecting' ? 'dot-offline' : 'dot-blocked'}`} />
+          {wsStatus === 'connected' ? 'live' : wsStatus}
+        </span>
       </div>
 
-      {/* Network Map */}
-      <div className="rounded-xl overflow-hidden" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <div className="flex items-center gap-2">
-            <TrendingUp size={16} className="text-blue-400" />
-            <span className="text-sm font-semibold text-white">Network Map</span>
-          </div>
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Stat label="online" value={onlineCount} accent="dot-online" href="/devices" />
+        <Stat label="total" value={totalCount} accent="dot-offline" href="/devices" />
+        <Stat label="blocked" value={blockedCount} accent="dot-blocked" />
+        <Stat label="protected" value={protectedCount} accent="dot-online" />
+      </div>
+
+      {/* Network map */}
+      <div className="term-panel overflow-hidden">
+        <div className="panel-head">
+          <span className="panel-title">network map</span>
           {netInfo?.gateway_ip && (
-            <span className="text-xs text-slate-500">Gateway: {netInfo.gateway_ip}</span>
+            <span className="text-xs text-term-faint">gateway {netInfo.gateway_ip}</span>
           )}
         </div>
         <div style={{ height: 320 }}>
@@ -103,44 +87,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent Devices */}
-      <div className="rounded-xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <span className="text-sm font-semibold text-white">Recent Devices</span>
-          <Link to="/devices" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-            View all →
-          </Link>
+      {/* Recent devices — friendly card grid */}
+      <div>
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="panel-title">recent devices</span>
+          <Link to="/devices" className="text-xs text-term-accent hover:underline">view all →</Link>
         </div>
-        <div className="divide-y" style={{ '--tw-divide-opacity': 1 } as any}>
-          {devices.length === 0 && (
-            <p className="px-5 py-8 text-center text-sm text-slate-500">No devices discovered yet.</p>
-          )}
-          {devices.slice(0, 6).map((d) => (
-            <div key={d.mac_address} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                  d.is_blocked ? 'bg-red-400' : d.is_online ? 'bg-emerald-400 pulse' : 'bg-slate-600'
-                }`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{d.display_name}</p>
-                  <p className="text-xs text-slate-500 font-mono">{d.ip_address}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                <span className="text-xs text-slate-500 hidden sm:block">{d.vendor || '—'}</span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                  d.is_blocked
-                    ? 'bg-red-500/15 text-red-400'
-                    : d.is_online
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-slate-700/50 text-slate-500'
-                }`}>
-                  {d.is_blocked ? 'Blocked' : d.is_online ? 'Online' : 'Offline'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {recent.length === 0 ? (
+          <div className="rounded-[10px] border border-dashed border-term-border bg-term-bg-2 px-5 py-10 text-center">
+            <p className="text-sm text-term-text-dim">
+              <span className="term-prompt">scanning network</span><span className="blink" />
+            </p>
+            <p className="mt-1 text-xs text-term-faint">no devices discovered yet</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            {recent.map((d) => <DeviceCard key={d.mac_address} device={d} />)}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -18,16 +18,21 @@ export default {
         ],
       },
       colors: {
-        // Phosphor terminal palette (mirrors CSS variables in index.css)
+        // "Clean Terminal" palette (mirrors CSS variables in index.css)
         term: {
-          bg: '#0a0e0a',
-          'bg-2': '#0e140e',
-          fg: '#c8f7c5',
-          green: '#33ff66',
-          amber: '#ffb000',
-          dim: '#4a6a4f',
-          accent: '#00e0ff',
-          danger: '#ff5f56',
+          bg: '#0b0e10',
+          'bg-2': '#12171a',
+          'bg-3': '#181f23',
+          fg: '#e6edf1',
+          green: '#4cc38a',
+          amber: '#d6a13a',
+          dim: '#8b969c',          // readable muted TEXT (text-term-dim)
+          border: '#222b30',
+          'border-strong': '#2f3a40',
+          'text-dim': '#93a4ac',
+          faint: '#5a666d',
+          accent: '#58b2c9',
+          danger: '#e0604e',
         },
         // Legacy brand colors (kept for compatibility)
         brand: {

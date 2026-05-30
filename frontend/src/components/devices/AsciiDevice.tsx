@@ -162,9 +162,9 @@ const KEYFRAMES = `
   50%      { opacity: 0.35; }
 }
 .ad-art { white-space: pre; line-height: 1.05; font-family: var(--term-font); display: inline-block; }
-.ad-online  { color: var(--term-green); text-shadow: 0 0 4px rgba(51,255,102,0.45); }
-.ad-offline { color: var(--term-dim); animation: ad-offline-flicker 5s steps(40) infinite; }
-.ad-blocked { color: var(--term-danger); text-shadow: 0 0 5px rgba(255,95,86,0.55); animation: ad-block-flash 0.9s steps(2, start) infinite; }
+.ad-online  { color: var(--term-green); }
+.ad-offline { color: var(--term-faint); animation: ad-offline-flicker 5s steps(40) infinite; }
+.ad-blocked { color: var(--term-danger); animation: ad-block-flash 1.1s steps(2, start) infinite; }
 .ad-sig-on      { animation: ad-sig 1.1s steps(3, start) infinite; }
 .ad-sig-static  { animation: ad-static 0.4s steps(5) infinite; }
 .ad-pwr-on      { color: var(--term-amber); animation: ad-pwr 1.6s ease-in-out infinite; }

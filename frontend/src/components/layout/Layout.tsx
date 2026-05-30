@@ -4,7 +4,7 @@ import TopBar from './TopBar'
 
 export default function Layout() {
   return (
-    <div className="crt scanlines flicker min-h-screen bg-term-bg text-term-fg">
+    <div className="min-h-screen bg-term-bg text-term-fg">
       <Sidebar />
       <TopBar />
       <main

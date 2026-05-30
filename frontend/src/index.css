@@ -1,267 +1,173 @@
-/* Monospace web font as progressive enhancement (falls back to system mono) */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   ROOST — "Clean Terminal" design language
+   Flat. Monospace. One accent. Crisp 1px borders. Smooth motion.
+   No gradients, no scanlines, no glow. (Linear/Warp/Raycast energy.)
+   Class & token names are kept stable so components stay in sync.
+   ============================================================ */
 :root {
-  --sidebar-width: 256px;
+  --sidebar-width: 248px;
   --topbar-height: 56px;
 
-  /* ---- Legacy tokens (kept for compatibility) ---- */
-  --color-bg: #060b17;
-  --color-surface: #0d1424;
-  --color-surface-2: #111827;
-  --color-border: #1a2744;
-  --color-border-light: #1e293b;
+  /* surfaces */
+  --term-bg:      #0b0e10;   /* app background (near-black, neutral) */
+  --term-bg-2:    #12171a;   /* raised panel */
+  --term-bg-3:    #181f23;   /* hover / inset */
 
-  /* ---- Terminal / phosphor palette ---- */
-  --term-bg: #0a0e0a;        /* near-black, faint green tint */
-  --term-bg-2: #0e140e;      /* raised panel background */
-  --term-fg: #c8f7c5;        /* default phosphor text */
-  --term-green: #33ff66;     /* primary phosphor green */
-  --term-amber: #ffb000;     /* amber phosphor (warnings/accents) */
-  --term-dim: #4a6a4f;       /* dimmed / muted text + borders */
-  --term-accent: #00e0ff;    /* cyan accent for links/highlights */
-  --term-danger: #ff5f56;    /* error red */
+  /* borders */
+  --term-border:        #222b30;
+  --term-border-strong: #2f3a40;
+  --term-dim:           #222b30;  /* legacy alias used as border by components */
 
-  --term-font: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular,
-    'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-}
+  /* text */
+  --term-fg:       #e6edf1;   /* primary text */
+  --term-text-dim: #93a4ac;   /* secondary */
+  --term-faint:    #5a666d;   /* tertiary / disabled */
 
-body {
-  background-color: var(--term-bg);
-  color: var(--term-fg);
-  font-family: var(--term-font);
-  margin: 0;
+  /* one accent + semantic status */
+  --term-green:  #4cc38a;   /* THE accent (online / primary) */
+  --term-amber:  #d6a13a;   /* warning / protected */
+  --term-accent: #58b2c9;   /* secondary cool accent (links/meta), used sparingly */
+  --term-danger: #e0604e;   /* blocked / error */
+
+  --term-font: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo,
+    Consolas, 'Liberation Mono', monospace;
+
+  /* legacy tokens some components still reference */
+  --color-bg: var(--term-bg);
+  --color-surface: var(--term-bg-2);
+  --color-surface-2: var(--term-bg-3);
+  --color-border: var(--term-border);
+  --color-border-light: var(--term-border-strong);
 }
 
 * { box-sizing: border-box; }
 
-/* Scrollbar — phosphor themed */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--term-dim); border-radius: 0; }
-::-webkit-scrollbar-thumb:hover { background: var(--term-green); }
-
-/* Smooth page transitions */
-main { transition: none; }
-
-/* ============================================================
-   TERMINAL / CRT AESTHETIC UTILITIES
-   ============================================================ */
-
-/* --- CRT shell: faint phosphor glow + vignette on a container --- */
-.crt {
-  background: var(--term-bg);
+html, body {
+  margin: 0;
+  background-color: var(--term-bg);
   color: var(--term-fg);
-  text-shadow: 0 0 2px rgba(51, 255, 102, 0.35);
-  position: relative;
+  font-family: var(--term-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* --- Scanline overlay (apply to a container; uses ::after) --- */
-.scanlines { position: relative; }
-.scanlines::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0) 0px,
-    rgba(0, 0, 0, 0) 2px,
-    rgba(0, 0, 0, 0.18) 3px,
-    rgba(0, 0, 0, 0.18) 4px
-  );
-  z-index: 50;
-  mix-blend-mode: multiply;
-}
-/* subtle whole-screen brightness flicker */
-.scanlines.flicker::after { animation: flicker 4s infinite steps(60); }
+/* tidy scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--term-border-strong); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--term-faint); }
 
-/* --- ASCII box-drawing panel ---
-   Renders a 1px box. Two pseudo-elements draw the diagonal corner glyphs
-   ┌ (top-left) and ┘ (bottom-right) so the panel reads as an ASCII box while
-   keeping the markup DOM-free. For all-four-corner boxes, nest an empty
-   <span class="term-corners" /> which paints ┐ (top-right) and └ (bottom-left). */
+::selection { background: rgba(76, 195, 138, 0.25); }
+
+/* keyboard focus ring (accessible, subtle) */
+:focus-visible { outline: 1px solid var(--term-green); outline-offset: 2px; }
+
+/* ---- text color tokens ---- */
+.term-fg     { color: var(--term-fg); }
+.term-green  { color: var(--term-green); }
+.term-amber  { color: var(--term-amber); }
+.term-accent { color: var(--term-accent); }
+.term-dim    { color: var(--term-text-dim); }
+.term-faint  { color: var(--term-faint); }
+.term-danger { color: var(--term-danger); }
+
+/* glow helpers are intentionally flat now (kept as no-ops for compatibility) */
+.term-glow, .term-glow-amber, .term-glow-cyan { text-shadow: none; }
+.crt { background: var(--term-bg); color: var(--term-fg); }
+
+/* scanline / flicker / scan-beam gimmicks removed — neutralized, not deleted,
+   so any leftover className renders cleanly. */
+.scanlines, .scanlines::after { content: none; background: none; animation: none; }
+.flicker { animation: none; }
+.scan-beam { display: none; }
+.term-corners { display: none; }
+
+/* ---- Panel: clean bordered surface ---- */
 .term-panel {
   position: relative;
   background: var(--term-bg-2);
-  border: 1px solid var(--term-dim);
-  border-radius: 0;
-  padding: 1rem;
-  font-family: var(--term-font);
+  border: 1px solid var(--term-border);
+  border-radius: 10px;
+  padding: 0;             /* let inner sections control padding */
 }
-.term-panel::before,
-.term-panel::after {
-  position: absolute;
-  font-family: var(--term-font);
-  color: var(--term-green);
-  font-size: 1rem;
-  line-height: 1;
-  pointer-events: none;
+.term-panel::before, .term-panel::after { content: none; }  /* drop ASCII corner glyphs */
+.term-panel-active { border-color: var(--term-green); }
+
+/* a header row that sits inside a panel, like a section legend */
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem;
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--term-border);
 }
-/* top-left corner */
-.term-panel::before {
-  content: "┌";
-  top: -0.55em;
-  left: -1px;
-}
-/* bottom-right corner */
-.term-panel::after {
-  content: "┘";
-  bottom: -0.55em;
-  right: -1px;
-}
-/* Optional: paint the other two corners (┐ top-right, └ bottom-left) for a
-   full ASCII box. Drop an empty <span class="term-corners" /> inside a
-   `.term-panel` (the panel is already `position: relative`). */
-.term-corners {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  color: var(--term-green);
-  font-family: var(--term-font);
-}
-.term-corners::before {
-  content: "┐";
-  position: absolute;
-  top: -0.55em;
-  right: -1px;
-  font-size: 1rem;
-  line-height: 1;
-}
-.term-corners::after {
-  content: "└";
-  position: absolute;
-  bottom: -0.55em;
-  left: -1px;
-  font-size: 1rem;
-  line-height: 1;
-}
-/* highlighted (focused/active) panel */
-.term-panel-active {
-  border-color: var(--term-green);
-  box-shadow: 0 0 12px rgba(51, 255, 102, 0.18);
+.panel-title {
+  font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--term-text-dim);
 }
 
-/* --- Phosphor text glow helpers --- */
-.term-glow       { text-shadow: 0 0 6px rgba(51, 255, 102, 0.55); }
-.term-glow-amber { text-shadow: 0 0 6px rgba(255, 176, 0, 0.55); }
-.term-glow-cyan  { text-shadow: 0 0 6px rgba(0, 224, 255, 0.55); }
-
-/* --- Text color tokens --- */
-.term-fg       { color: var(--term-fg); }
-.term-green    { color: var(--term-green); }
-.term-amber    { color: var(--term-amber); }
-.term-dim      { color: var(--term-dim); }
-.term-accent   { color: var(--term-accent); }
-.term-danger   { color: var(--term-danger); }
-
-/* --- Blinking block cursor ---
-   Use on an empty <span class="blink"> or after prompt text. */
-.blink {
-  display: inline-block;
-  width: 0.6em;
-  height: 1.05em;
-  background: var(--term-green);
-  vertical-align: text-bottom;
-  margin-left: 2px;
-  animation: blink 1s steps(2, start) infinite;
-}
-/* blinking text variant (for cursors made of glyphs like █ or _) */
-.blink-text { animation: blink 1s steps(2, start) infinite; }
-
-/* --- Terminal button --- */
+/* ---- Buttons: flat, crisp, smooth ---- */
 .term-btn {
   font-family: var(--term-font);
-  background: transparent;
-  color: var(--term-green);
-  border: 1px solid var(--term-dim);
-  border-radius: 0;
-  padding: 0.35rem 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: .78rem;
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--term-bg-3);
+  color: var(--term-fg);
+  border: 1px solid var(--term-border-strong);
+  border-radius: 7px;
+  padding: .4rem .7rem;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease,
-    box-shadow 120ms ease;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
-.term-btn::before { content: "[ "; color: var(--term-dim); }
-.term-btn::after  { content: " ]"; color: var(--term-dim); }
-.term-btn:hover {
-  background: var(--term-green);
-  color: var(--term-bg);
-  border-color: var(--term-green);
-  box-shadow: 0 0 12px rgba(51, 255, 102, 0.35);
-}
-.term-btn:hover::before,
-.term-btn:hover::after { color: var(--term-bg); }
-.term-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
-/* amber + danger variants */
-.term-btn-amber  { color: var(--term-amber); }
-.term-btn-amber:hover  { background: var(--term-amber); border-color: var(--term-amber); box-shadow: 0 0 12px rgba(255,176,0,0.35); }
-.term-btn-danger { color: var(--term-danger); }
-.term-btn-danger:hover { background: var(--term-danger); border-color: var(--term-danger); box-shadow: 0 0 12px rgba(255,95,86,0.35); }
+.term-btn::before, .term-btn::after { content: none; }   /* drop the [ ] brackets */
+.term-btn:hover { background: #1d262b; border-color: var(--term-faint); }
+.term-btn:disabled { opacity: .45; cursor: not-allowed; }
+.term-btn-amber  { color: var(--term-amber);  border-color: rgba(214,161,58,.4); }
+.term-btn-amber:hover  { background: rgba(214,161,58,.12); border-color: var(--term-amber); }
+.term-btn-danger { color: var(--term-danger); border-color: rgba(224,96,78,.4); }
+.term-btn-danger:hover { background: rgba(224,96,78,.12); border-color: var(--term-danger); }
 
-/* --- Prompt prefix helper (renders a "user@roost:~$ " style lead-in) --- */
-.term-prompt::before {
-  content: "> ";
-  color: var(--term-green);
+/* primary (accent) button */
+.term-btn-primary {
+  background: rgba(76,195,138,.12); color: var(--term-green);
+  border-color: rgba(76,195,138,.4);
 }
+.term-btn-primary:hover { background: rgba(76,195,138,.2); border-color: var(--term-green); }
 
-/* --- Boot-log line (monospace dimmed, used for log streams) --- */
-.term-log {
-  font-family: var(--term-font);
-  color: var(--term-dim);
-  white-space: pre-wrap;
-  line-height: 1.45;
-}
+/* ---- prompt + log helpers ---- */
+.term-prompt::before { content: "> "; color: var(--term-green); }
+.term-log { font-family: var(--term-font); color: var(--term-faint); white-space: pre-wrap; line-height: 1.5; }
 
-/* ============================================================
-   Keyframes (mirrored in tailwind.config.js)
-   ============================================================ */
-@keyframes blink   { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-@keyframes flicker {
-  0%, 100% { opacity: 1; }
-  92% { opacity: 1; }
-  93% { opacity: 0.7; }
-  94% { opacity: 1; }
-  97% { opacity: 0.85; }
-  98% { opacity: 1; }
-}
-@keyframes scan {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
+/* ---- status dot ---- */
+.dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; flex: none; }
+.dot-online  { background: var(--term-green); }
+.dot-offline { background: var(--term-faint); }
+.dot-blocked { background: var(--term-danger); }
+
+/* ---- blinking cursor (subtle) ---- */
+.blink, .blink-text { animation: blink 1.1s steps(2, start) infinite; }
+.blink {
+  display: inline-block; width: .55em; height: 1em;
+  background: var(--term-green); vertical-align: text-bottom; margin-left: 2px;
 }
 
-/* --- Moving scanbeam: an element that sweeps top->bottom of its parent --- */
-.scan-beam {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 40px;
-  background: linear-gradient(to bottom, rgba(51,255,102,0) 0%, rgba(51,255,102,0.06) 50%, rgba(51,255,102,0) 100%);
-  pointer-events: none;
-  animation: scan 6s linear infinite;
-}
+/* gentle entrance for cards/rows */
+.rise { animation: rise 220ms ease both; }
 
-/* ============================================================
-   Legacy utilities (kept so existing components don't break)
-   ============================================================ */
-.glow-blue  { box-shadow: 0 0 20px rgba(59,130,246,0.15); }
-.glow-red   { box-shadow: 0 0 20px rgba(239,68,68,0.15); }
-.glow-green { box-shadow: 0 0 20px rgba(16,185,129,0.12); }
+/* legacy card */
+.card { background: var(--term-bg-2); border: 1px solid var(--term-border); border-radius: 10px; }
+.glow-blue, .glow-red, .glow-green { box-shadow: none; }
 
-.card {
-  @apply border;
-  background: var(--term-bg-2);
-  border-color: var(--term-dim);
-  border-radius: 0;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .6; transform: scale(1.3); }
-}
-.pulse { animation: pulse-dot 2s ease-in-out infinite; }
+/* ---- keyframes ---- */
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.pulse { animation: pulse-dot 2.2s ease-in-out infinite; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* keep names referenced elsewhere defined, but inert */
+@keyframes flicker { 0%, 100% { opacity: 1; } }
+@keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }

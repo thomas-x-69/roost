@@ -1,0 +1,22 @@
+[project]
+name = "roost"
+version = "1.0.0"
+description = "Self-hosted dashboard to monitor and manage devices on your own local network."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "The Roost Authors" }]
+keywords = ["network", "monitoring", "self-hosted", "fastapi", "lan", "dashboard"]
+
+# Runtime dependencies are tracked in requirements.txt to keep a single source
+# of truth for the pinned set; install with `pip install -r requirements.txt`.
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "pytest-playwright==0.7.2",
+    "playwright==1.59.0",
+]
+
+# Pytest configuration lives in pytest.ini (single source of truth).

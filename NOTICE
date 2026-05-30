@@ -1,0 +1,26 @@
+Roost
+Copyright 2026 The Roost Authors
+
+This product includes software developed by The Roost Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this product except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+---------------------------------------------------------------------
+Third-party data fetched at runtime (NOT redistributed in this repo):
+
+  * Wireshark "manuf" OUI database
+    Source: https://www.wireshark.org/download/automated/data/manuf.gz
+    License: GPL-2.0 (Wireshark project)
+    Used only as a local lookup cache for MAC-vendor resolution. It is
+    downloaded on first run and is git-ignored; it is never bundled or
+    redistributed as part of Roost. A small built-in OUI fallback
+    table (backend/services/oui_resolver.py) is used when it is absent.
+
+  * StevenBlack/hosts unified blocklist
+    Source: https://github.com/StevenBlack/hosts
+    License: MIT
+    Fetched on demand to populate the local threat blocklist.

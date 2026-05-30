@@ -1,0 +1,16 @@
+# Roost runtime dependencies. Dev/test deps live in requirements-dev.txt.
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+websockets==13.1
+python-multipart==0.0.12
+sqlalchemy[asyncio]==2.0.36
+aiosqlite==0.20.0
+scapy==2.6.1
+apscheduler==3.10.4
+reportlab==4.2.5
+pydantic==2.10.1
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+httpx==0.28.0
+aiofiles==24.1.0
+psutil==6.1.0

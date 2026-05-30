@@ -1,0 +1,58 @@
+# ─── Python ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.Python
+build/
+dist/
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ─── Node / frontend ─────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+*.tsbuildinfo
+.vite/
+
+# ─── Roost runtime data (contains real network MAC/IP/DNS data) ─────────
+# NEVER commit these — they leak the operator's private network information.
+data/roost.db
+data/roost.db-wal
+data/roost.db-shm
+data/reports/*.pdf
+data/blocklists/*
+!data/blocklists/.gitkeep
+
+# Wireshark OUI database (GPLv2, ~3MB) — fetched at runtime, not committed.
+data/manuf
+data/manuf.gz
+
+# ─── Logs ──────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Secrets / local config ─────────────────────────────────────────────────
+.env
+.env.local
+*.local
+
+# ─── Screenshots / scratch (regenerate as needed) ───────────────────────────
+*.png
+!docs/**/*.png
+
+# ─── OS / editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

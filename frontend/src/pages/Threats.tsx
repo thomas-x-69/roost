@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert, Search, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import client from '../api/client'
+import AsciiIcon from '../components/ui/AsciiIcon'
 
 const fetchThreats = async () => {
   const { data } = await client.get('/threats')
@@ -50,11 +51,15 @@ export default function Threats() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Threats</h1>
-          <p className="text-gray-400 text-sm mt-1">
+          <h1 className="text-lg text-term-fg">
+            <span className="text-acc-red">root@roost</span>
+            <span className="text-term-text-dim">:~$ </span>
+            threats
+          </h1>
+          <p className="mt-0.5 text-xs text-term-text-dim tabular-nums">
             {stats?.total_entries?.toLocaleString() ?? 0} domains in blocklist
           </p>
         </div>
@@ -62,7 +67,7 @@ export default function Threats() {
           data-testid="update-blocklists-btn"
           onClick={() => updateBlocklists.mutate()}
           disabled={updateBlocklists.isPending}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white rounded-lg text-sm disabled:opacity-50"
+          className="term-btn"
         >
           <RefreshCw size={14} className={updateBlocklists.isPending ? 'animate-spin' : ''} />
           Update Blocklists
@@ -70,8 +75,11 @@ export default function Threats() {
       </div>
 
       {/* Domain checker */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-        <div className="text-sm font-medium text-white mb-3">Check a Domain</div>
+      <div className="term-panel p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <AsciiIcon name="search" className="text-acc-red" title="" />
+          <span className="panel-title">check a domain</span>
+        </div>
         <div className="flex gap-2">
           <input
             type="text"
@@ -79,40 +87,54 @@ export default function Threats() {
             onChange={e => setCheckDomain(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCheck()}
             placeholder="e.g. doubleclick.net"
-            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="flex-1 rounded-[7px] border border-term-border bg-term-bg px-3 py-2 text-sm text-term-fg placeholder-term-faint transition-colors duration-150 focus:outline-none focus:border-acc-red"
           />
           <button
             data-testid="check-domain-btn"
             onClick={handleCheck}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+            className="term-btn term-btn-danger"
           >
-            <Search size={14} /> Check
+            <AsciiIcon name="search" title="" /> Check
           </button>
         </div>
         {checkResult && (
-          <div role="status" aria-live="polite" data-testid="domain-check-result" className={`mt-3 p-3 rounded-lg text-sm ${checkResult.is_threat ? 'bg-red-900/40 border border-red-800 text-red-300' : 'bg-green-900/40 border border-green-800 text-green-300'}`}>
-            <strong>{checkResult.domain}</strong>{' '}
+          <div
+            role="status"
+            aria-live="polite"
+            data-testid="domain-check-result"
+            className={`mt-3 rounded-[7px] border p-3 text-sm ${
+              checkResult.is_threat
+                ? 'border-term-danger/40 bg-term-danger/10 text-term-danger'
+                : 'border-term-green/40 bg-term-green/10 text-term-green'
+            }`}
+          >
+            <strong className="font-mono">{checkResult.domain}</strong>{' '}
             {checkResult.is_threat ? `⚠ Threat detected: ${checkResult.threat_type}` : '✓ Clean'}
           </div>
         )}
       </div>
 
       {/* Threat list */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
-        <div className="px-5 py-3 border-b border-gray-700 text-sm font-medium text-white flex items-center gap-2">
-          <ShieldAlert size={14} className="text-red-400" />
-          Blocked Domains
+      <div className="term-panel overflow-hidden">
+        <div className="panel-head">
+          <span className="panel-title flex items-center gap-2">
+            <AsciiIcon name="threats" className="text-acc-red" title="" />
+            blocked domains
+          </span>
         </div>
         {threats.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">
+          <div className="p-8 text-center text-sm text-term-text-dim">
             No threats loaded. Click "Update Blocklists" to fetch.
           </div>
         ) : (
           <div className="max-h-96 overflow-y-auto">
             {threats.slice(0, 50).map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between px-5 py-2 border-b border-gray-700 hover:bg-gray-700/50">
-                <span className="text-xs font-mono text-gray-300">{t.domain}</span>
-                <span className="text-xs text-red-400">{t.threat_type}</span>
+              <div
+                key={t.id}
+                className="flex items-center justify-between border-b border-term-border px-5 py-2 transition-colors duration-150 hover:bg-term-bg-3 last:border-b-0"
+              >
+                <span className="font-mono text-xs text-term-text-dim">{t.domain}</span>
+                <span className="text-xs text-acc-red">{t.threat_type}</span>
               </div>
             ))}
           </div>

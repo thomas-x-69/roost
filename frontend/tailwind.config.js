@@ -34,6 +34,18 @@ export default {
           accent: '#58b2c9',
           danger: '#e0604e',
         },
+        // Per-page accent colors (muted/refined — no neon, no gradients).
+        // Use as text-acc-cyan, border-acc-blue, bg-acc-amber/10, etc.
+        acc: {
+          green:  '#4cc38a',   // devices
+          cyan:   '#58b2c9',   // usage
+          blue:   '#5b8def',   // top-sites
+          amber:  '#d6a13a',   // schedules
+          orange: '#e08c4e',   // alerts
+          red:    '#e0604e',   // threats
+          violet: '#a98bdb',   // groups
+          sand:   '#c9a26b',   // reports
+        },
         // Legacy brand colors (kept for compatibility)
         brand: {
           50: '#eff6ff',

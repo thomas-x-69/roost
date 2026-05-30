@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { RefreshCw } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { triggerScan } from '../../api/devices'
 import { toast } from 'sonner'
 import { useLocation } from 'react-router-dom'
 import { useWsStatus } from '../../hooks/useWebSocket'
+import AsciiIcon from '../ui/AsciiIcon'
+import { getPageAccent } from '../../theme/pageAccents'
 
 const PAGE_TITLES: Record<string, string> = {
   '/':          'dashboard',
@@ -30,6 +31,7 @@ export default function TopBar() {
   const location = useLocation()
   const wsStatus = useWsStatus()
   const segment = PAGE_TITLES[location.pathname] ?? 'roost'
+  const accent = getPageAccent(location.pathname)
 
   const { data: countData } = useQuery({
     queryKey: ['alerts-count'],
@@ -68,10 +70,16 @@ export default function TopBar() {
       }}
     >
       {/* Shell prompt path */}
-      <h2 className="text-sm flex items-center gap-1">
+      <h2 className="text-sm flex items-center gap-1.5">
+        <AsciiIcon
+          name={(PAGE_TITLES[location.pathname] ?? 'dashboard') as any}
+          title=""
+          className="text-sm"
+          color={accent.hex}
+        />
         <span className="term-dim">root@roost</span>
         <span className="term-dim">:</span>
-        <span className="term-accent term-glow-cyan">/{segment}</span>
+        <span style={{ color: accent.hex }}>/{segment}</span>
         <span className="term-green">$</span>
         <span className="blink" />
       </h2>
@@ -85,10 +93,11 @@ export default function TopBar() {
         </div>
 
         {/* Alert link */}
-        <a href="/alerts" className="relative text-sm term-dim hover:text-term-fg transition-colors">
+        <a href="/alerts" className="relative flex items-center gap-1.5 text-sm term-dim hover:text-term-fg transition-colors">
+          <AsciiIcon name="alerts" title="" color="var(--acc-orange)" />
           alerts
           {unread > 0 && (
-            <span className="ml-1 term-danger term-glow-amber">
+            <span className="ml-0.5" style={{ color: 'var(--acc-orange)' }}>
               [{unread > 9 ? '9+' : unread}]
             </span>
           )}
@@ -101,7 +110,7 @@ export default function TopBar() {
           disabled={scanning || scanMutation.isPending}
           className="term-btn term-btn-amber flex items-center gap-1.5 text-sm"
         >
-          <RefreshCw size={13} className={scanning ? 'animate-spin' : ''} />
+          <AsciiIcon name="scan" title="" className={scanning ? 'animate-spin' : ''} />
           {scanning ? 'scanning' : 'scan-now'}
         </button>
 

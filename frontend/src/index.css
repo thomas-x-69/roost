@@ -35,6 +35,16 @@
   --term-accent: #58b2c9;   /* secondary cool accent (links/meta), used sparingly */
   --term-danger: #e0604e;   /* blocked / error */
 
+  /* per-page accent colors (muted/refined — mirror tailwind acc.* tokens) */
+  --acc-green:  #4cc38a;   /* devices    */
+  --acc-cyan:   #58b2c9;   /* usage      */
+  --acc-blue:   #5b8def;   /* top-sites  */
+  --acc-amber:  #d6a13a;   /* schedules  */
+  --acc-orange: #e08c4e;   /* alerts     */
+  --acc-red:    #e0604e;   /* threats    */
+  --acc-violet: #a98bdb;   /* groups     */
+  --acc-sand:   #c9a26b;   /* reports    */
+
   --term-font: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo,
     Consolas, 'Liberation Mono', monospace;
 

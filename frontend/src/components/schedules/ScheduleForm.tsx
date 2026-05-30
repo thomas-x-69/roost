@@ -47,29 +47,42 @@ export default function ScheduleForm({ onClose }: Props) {
     }))
   }
 
+  const inputCls =
+    'w-full bg-term-bg border border-term-border rounded-[7px] px-3 py-2 text-sm text-term-fg ' +
+    'placeholder-term-faint transition-colors duration-150 focus:outline-none focus:border-acc-amber'
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-lg font-semibold text-white mb-4">New Schedule</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="term-panel w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-acc-amber">{'>'}</span>
+          <h2 className="panel-title">new schedule</h2>
+        </div>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Name</label>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-term-text-dim">Name</label>
             <input
               data-testid="schedule-name-input"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Bedtime"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+              className={inputCls}
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Device</label>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-term-text-dim">Device</label>
             <select
               value={form.device_id}
               onChange={(e) => setForm((f) => ({ ...f, device_id: e.target.value }))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+              className={inputCls}
             >
               <option value="">All devices</option>
               {devicesData?.devices.map((d) => (
@@ -79,50 +92,50 @@ export default function ScheduleForm({ onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Action</label>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-term-text-dim">Action</label>
             <div className="flex gap-2">
               <button
                 data-testid="schedule-action-block"
                 onClick={() => setForm((f) => ({ ...f, action: 'block' }))}
-                className={`flex-1 py-2 rounded-lg text-sm border transition-colors ${
+                className={`flex-1 rounded-[7px] border py-2 text-sm transition-colors duration-150 ${
                   form.action === 'block'
-                    ? 'bg-red-900/30 border-red-700 text-red-400'
-                    : 'bg-gray-800 border-gray-700 text-gray-400'
+                    ? 'border-term-danger bg-term-danger/10 text-term-danger'
+                    : 'border-term-border bg-term-bg text-term-text-dim hover:border-term-border-strong'
                 }`}
               >Block</button>
               <button
                 onClick={() => setForm((f) => ({ ...f, action: 'unblock' }))}
-                className={`flex-1 py-2 rounded-lg text-sm border transition-colors ${
+                className={`flex-1 rounded-[7px] border py-2 text-sm transition-colors duration-150 ${
                   form.action === 'unblock'
-                    ? 'bg-green-900/30 border-green-700 text-green-400'
-                    : 'bg-gray-800 border-gray-700 text-gray-400'
+                    ? 'border-term-green bg-term-green/10 text-term-green'
+                    : 'border-term-border bg-term-bg text-term-text-dim hover:border-term-border-strong'
                 }`}
               >Unblock</button>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Time</label>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-term-text-dim">Time</label>
             <input
               data-testid="schedule-time-input"
               type="time"
               value={form.start_time}
               onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-term-bg border border-term-border rounded-[7px] px-3 py-2 text-sm text-term-fg tabular-nums transition-colors duration-150 focus:outline-none focus:border-acc-amber"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Days</label>
+            <label className="mb-2 block text-[11px] uppercase tracking-wider text-term-text-dim">Days</label>
             <div className="flex gap-1">
               {DAYS.map((day, i) => (
                 <button
                   key={day}
                   onClick={() => toggleDay(i)}
-                  className={`flex-1 py-1.5 text-xs rounded transition-colors ${
+                  className={`flex-1 rounded-[6px] border py-1.5 text-xs transition-colors duration-150 ${
                     form.days_of_week.includes(i)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-800 text-gray-400'
+                      ? 'border-acc-amber bg-acc-amber/10 text-acc-amber'
+                      : 'border-term-border bg-term-bg text-term-faint hover:border-term-border-strong'
                   }`}
                 >
                   {day.slice(0, 1)}
@@ -132,18 +145,15 @@ export default function ScheduleForm({ onClose }: Props) {
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 bg-gray-800 text-gray-400 rounded-lg text-sm hover:bg-gray-700"
-          >
+        <div className="mt-6 flex gap-3">
+          <button onClick={onClose} className="term-btn flex-1 justify-center">
             Cancel
           </button>
           <button
             data-testid="schedule-submit"
             onClick={() => mutation.mutate()}
             disabled={!form.name || mutation.isPending}
-            className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="term-btn term-btn-amber flex-1 justify-center"
           >
             Create Schedule
           </button>

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { FileText, Download, RefreshCw } from 'lucide-react'
+import AsciiIcon from '../components/ui/AsciiIcon'
 import client from '../api/client'
 import { toast } from 'sonner'
+
+const ACCENT = 'var(--acc-sand)'
 
 const fetchReports = async () => {
   const { data } = await client.get('/reports')
@@ -30,20 +32,34 @@ export default function Reports() {
   })
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Reports</h1>
-        <p className="text-gray-400 text-sm mt-1">Generate and download PDF network reports</p>
+    <div className="mx-auto max-w-6xl space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <AsciiIcon name="reports" color={ACCENT} className="text-xl" />
+        <div>
+          <h1 className="text-lg text-term-fg">
+            <span style={{ color: ACCENT }}>reports</span>
+            <span className="text-term-text-dim">:~$ </span>
+            export
+          </h1>
+          <p className="mt-0.5 text-xs text-term-text-dim">Generate and download PDF network reports</p>
+        </div>
       </div>
 
       {/* Generate form */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-        <div className="text-sm font-medium text-white mb-4">Generate New Report</div>
-        <div className="flex items-center gap-3">
+      <div className="term-panel overflow-hidden">
+        <div className="panel-head">
+          <span className="panel-title">generate new report</span>
+        </div>
+        <div className="flex items-center gap-3 p-5">
           <select
             value={period}
             onChange={e => setPeriod(e.target.value)}
-            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            className="rounded-[7px] border border-term-border-strong bg-term-bg-3 px-3 py-2 text-sm text-term-fg
+                       transition-colors duration-150 focus:outline-none"
+            style={{ outline: 'none' }}
+            onFocus={e => (e.currentTarget.style.borderColor = '#c9a26b')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'var(--term-border-strong)')}
           >
             <option value="today">Today</option>
             <option value="week">Last 7 Days</option>
@@ -53,43 +69,48 @@ export default function Reports() {
             data-testid="generate-report-btn"
             onClick={() => generate.mutate()}
             disabled={generate.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm"
+            className="term-btn"
+            style={{ color: ACCENT, borderColor: 'rgba(201,162,107,.4)', background: 'rgba(201,162,107,.12)' }}
           >
             {generate.isPending ? (
-              <><RefreshCw size={14} className="animate-spin" /> Generating...</>
+              <><AsciiIcon name="refresh" className="animate-spin" /> Generating...</>
             ) : (
-              <><FileText size={14} /> Generate PDF</>
+              <><AsciiIcon name="reports" /> Generate PDF</>
             )}
           </button>
         </div>
       </div>
 
       {/* Report list */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
-        <div className="px-5 py-3 border-b border-gray-700 text-sm font-medium text-white">
-          Generated Reports
+      <div className="term-panel overflow-hidden">
+        <div className="panel-head">
+          <span className="panel-title">generated reports</span>
         </div>
         {reports.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">
-            No reports yet. Generate one above.
+          <div className="p-8 text-center text-sm text-term-faint">
+            <span className="term-prompt">no reports yet — generate one above</span>
           </div>
         ) : (
           <div>
             {reports.map((r: any) => (
-              <div key={r.filename} className="flex items-center justify-between px-5 py-3 border-b border-gray-700 last:border-0 hover:bg-gray-700/50">
+              <div
+                key={r.filename}
+                className="flex items-center justify-between border-b border-term-border px-5 py-3
+                           transition-colors duration-150 last:border-0 hover:bg-term-bg-3"
+              >
                 <div className="flex items-center gap-3">
-                  <FileText size={16} className="text-gray-500" />
+                  <AsciiIcon name="reports" color={ACCENT} />
                   <div>
-                    <div className="text-sm text-white">{r.filename}</div>
-                    <div className="text-xs text-gray-500">{formatSize(r.size)}</div>
+                    <div className="text-sm text-term-fg">{r.filename}</div>
+                    <div className="text-xs text-term-faint">{formatSize(r.size)}</div>
                   </div>
                 </div>
                 <a
                   href={`/api/v1/reports/${r.filename}`}
                   download={r.filename}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-xs"
+                  className="term-btn"
                 >
-                  <Download size={12} /> Download
+                  <AsciiIcon name="download" /> Download
                 </a>
               </div>
             ))}

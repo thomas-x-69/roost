@@ -1,16 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, CheckCheck, Trash2 } from 'lucide-react'
 import client from '../api/client'
+import AsciiIcon from '../components/ui/AsciiIcon'
 
 const fetchAlerts = async () => {
   const { data } = await client.get('/alerts?limit=100')
   return data
 }
 
-const severityColor = (s: string) => {
-  if (s === 'critical') return 'text-red-400 bg-red-900/30 border-red-800'
-  if (s === 'warning') return 'text-yellow-400 bg-yellow-900/30 border-yellow-800'
-  return 'text-blue-400 bg-blue-900/30 border-blue-800'
+const severityStyle = (s: string) => {
+  if (s === 'critical') return 'border-term-danger/40 text-term-danger'
+  if (s === 'warning') return 'border-acc-orange/40 text-acc-orange'
+  return 'border-term-border text-term-text-dim'
+}
+
+const severityDot = (s: string) => {
+  if (s === 'critical') return 'dot-blocked'
+  if (s === 'warning') return ''
+  return 'dot-offline'
 }
 
 export default function Alerts() {
@@ -24,38 +30,46 @@ export default function Alerts() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Alerts</h1>
-          <p className="text-gray-400 text-sm mt-1">{alerts.length} total alerts</p>
+          <h1 className="text-lg text-term-fg">
+            <span className="text-acc-orange">root@roost</span>
+            <span className="text-term-text-dim">:~$ </span>
+            alerts
+          </h1>
+          <p className="mt-0.5 text-xs text-term-text-dim tabular-nums">{alerts.length} total alerts</p>
         </div>
-        <button
-          onClick={() => readAll.mutate()}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700"
-        >
-          <CheckCheck size={14} /> Mark all read
+        <button onClick={() => readAll.mutate()} className="term-btn">
+          <AsciiIcon name="unblock" title="" /> mark all read
         </button>
       </div>
 
       <div data-testid="alerts-list" className="space-y-2">
         {alerts.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Bell size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No alerts yet</p>
+          <div className="rounded-[10px] border border-dashed border-term-border bg-term-bg-2 px-5 py-12 text-center">
+            <AsciiIcon name="alerts" className="text-2xl text-acc-orange" title="" />
+            <p className="mt-2 text-sm text-term-text-dim">no alerts yet</p>
           </div>
         ) : (
           alerts.map((a: any) => (
             <div
               key={a.id}
               data-testid="alert-row"
-              className={`flex items-start gap-3 p-4 rounded-xl border ${severityColor(a.severity)} ${!a.is_read ? 'ring-1 ring-inset ring-current/20' : 'opacity-60'}`}
+              className={`flex items-start gap-3 rounded-[10px] border bg-term-bg-2 p-4 transition-colors duration-150 ${severityStyle(a.severity)} ${!a.is_read ? '' : 'opacity-60'}`}
             >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium">{a.title}</div>
-                <div className="text-xs mt-0.5 opacity-80">{a.message}</div>
-                <div className="text-xs mt-1 opacity-50">{new Date(a.created_at).toLocaleString()}</div>
+              <span
+                className={`dot mt-1.5 ${severityDot(a.severity)}`}
+                style={a.severity === 'warning' ? { background: 'var(--acc-orange)' } : undefined}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-term-fg">{a.title}</div>
+                <div className="mt-0.5 text-xs text-term-text-dim">{a.message}</div>
+                <div className="mt-1 text-xs text-term-faint tabular-nums">{new Date(a.created_at).toLocaleString()}</div>
               </div>
+              {!a.is_read && (
+                <span className="text-[10px] uppercase tracking-wider text-current">new</span>
+              )}
             </div>
           ))
         )}

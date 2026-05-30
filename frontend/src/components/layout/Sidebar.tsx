@@ -4,17 +4,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { pauseAll, resumeAll } from '../../api/system'
 import { toast } from 'sonner'
 import { useWsStatus } from '../../hooks/useWebSocket'
+import AsciiIcon, { type AsciiIconName } from '../ui/AsciiIcon'
+import { getPageAccent } from '../../theme/pageAccents'
 
-const navItems = [
-  { to: '/',          cmd: 'dashboard', end: true },
-  { to: '/devices',   cmd: 'devices' },
-  { to: '/groups',    cmd: 'groups' },
-  { to: '/schedules', cmd: 'schedules' },
-  { to: '/usage',     cmd: 'usage' },
-  { to: '/top-sites', cmd: 'top-sites' },
-  { to: '/threats',   cmd: 'threats' },
-  { to: '/alerts',    cmd: 'alerts' },
-  { to: '/reports',   cmd: 'reports' },
+const navItems: { to: string; cmd: string; icon: AsciiIconName; end?: boolean }[] = [
+  { to: '/',          cmd: 'dashboard', icon: 'dashboard', end: true },
+  { to: '/devices',   cmd: 'devices',   icon: 'devices' },
+  { to: '/groups',    cmd: 'groups',    icon: 'groups' },
+  { to: '/schedules', cmd: 'schedules', icon: 'schedules' },
+  { to: '/usage',     cmd: 'usage',     icon: 'usage' },
+  { to: '/top-sites', cmd: 'top-sites', icon: 'top-sites' },
+  { to: '/threats',   cmd: 'threats',   icon: 'threats' },
+  { to: '/alerts',    cmd: 'alerts',    icon: 'alerts' },
+  { to: '/reports',   cmd: 'reports',   icon: 'reports' },
 ]
 
 // Small ASCII "ROOST" logo rendered in the sidebar header.
@@ -28,6 +30,7 @@ const ROOST_ASCII = String.raw`
 export default function Sidebar() {
   const queryClient = useQueryClient()
   const [paused, setPaused] = useState(false)
+  const [hovered, setHovered] = useState<string | null>(null)
   const wsStatus = useWsStatus()
 
   const wsColor =
@@ -81,30 +84,56 @@ export default function Sidebar() {
         <div className="px-2 pb-2 text-[10px] uppercase tracking-widest term-dim">
           // commands
         </div>
-        {navItems.map(({ to, cmd, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-2 py-1.5 text-sm transition-colors duration-100 ${
-                isActive
-                  ? 'text-term-green term-glow bg-term-green/10'
-                  : 'text-term-dim hover:text-term-fg hover:bg-term-green/5'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className={isActive ? 'text-term-green' : 'term-dim'}>
-                  {isActive ? '>' : ' '}
-                </span>
-                <span className="lowercase">{cmd}</span>
-                {isActive && <span className="ml-auto blink" />}
-              </>
-            )}
-          </NavLink>
-        ))}
+        {navItems.map(({ to, cmd, icon, end }) => {
+          const accent = getPageAccent(to)
+          const isHovered = hovered === to
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onMouseEnter={() => setHovered(to)}
+              onMouseLeave={() => setHovered((h) => (h === to ? null : h))}
+              style={({ isActive }) => ({
+                backgroundColor: isActive
+                  ? `color-mix(in srgb, ${accent.hex} 12%, transparent)`
+                  : isHovered
+                    ? `color-mix(in srgb, ${accent.hex} 6%, transparent)`
+                    : 'transparent',
+              })}
+              className="flex items-center gap-2 px-2 py-1.5 text-sm text-term-dim transition-colors duration-150"
+            >
+              {({ isActive }) => {
+                const tinted = isActive || isHovered
+                return (
+                  <>
+                    <span
+                      className="w-2 text-center"
+                      style={{ color: tinted ? accent.hex : 'var(--term-faint)' }}
+                    >
+                      {isActive ? '>' : ' '}
+                    </span>
+                    <AsciiIcon
+                      name={icon}
+                      title=""
+                      className="w-4 text-center"
+                      color={tinted ? accent.hex : 'var(--term-dim)'}
+                    />
+                    <span
+                      className="lowercase transition-colors duration-150"
+                      style={{ color: tinted ? accent.hex : undefined }}
+                    >
+                      {cmd}
+                    </span>
+                    {isActive && (
+                      <span className="ml-auto blink" style={{ color: accent.hex }} />
+                    )}
+                  </>
+                )
+              }}
+            </NavLink>
+          )
+        })}
       </nav>
 
       {/* ── Pause / Resume All ── */}

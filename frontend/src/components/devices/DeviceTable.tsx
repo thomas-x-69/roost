@@ -1,42 +1,55 @@
 import type { Device } from '../../types/device'
 import DeviceRow from './DeviceRow'
-import { Wifi } from 'lucide-react'
 
 interface Props {
   devices: Device[]
   loading?: boolean
 }
 
+const HEADERS = ['DEVICE', 'IP / MAC', 'STATUS', 'LAST SEEN', 'CONTROL', 'BANDWIDTH LIMIT']
+
 export default function DeviceTable({ devices, loading }: Props) {
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-slate-500 gap-3">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm">Scanning network…</p>
+      <div className="term-panel crt scanlines flicker flex flex-col items-center justify-center py-24 gap-3">
+        <span className="term-corners" />
+        <p className="term-green term-glow text-sm term-prompt">
+          scanning network<span className="blink-text">_</span>
+        </p>
       </div>
     )
   }
 
   if (devices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-slate-500 gap-3">
-        <Wifi size={36} className="text-slate-700" />
-        <p className="text-sm">No devices found. Click <strong className="text-slate-400">Scan Now</strong> to discover devices.</p>
+      <div className="term-panel crt flex flex-col items-center justify-center py-24 gap-3">
+        <span className="term-corners" />
+        <pre className="term-dim text-xs leading-tight" aria-hidden="true">{`  .------.
+  | ~no~ |
+  | dev  |
+  '------'`}</pre>
+        <p className="term-dim text-sm term-prompt">
+          no devices found — run <span className="term-amber">SCAN NOW</span> to discover devices
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--color-border)' }}>
-      <table data-testid="device-table" className="w-full text-left">
+    <div className="term-panel crt scanlines relative overflow-x-auto">
+      <span className="term-corners" />
+      <span className="scan-beam" />
+      <table data-testid="device-table" className="w-full text-left relative z-10">
         <thead>
-          <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--color-border)' }}>
-            <th className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Device</th>
-            <th className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">IP / MAC</th>
-            <th className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
-            <th className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Seen</th>
-            <th className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Control</th>
-            <th className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Bandwidth Limit</th>
+          <tr style={{ borderBottom: '1px solid var(--term-dim)' }}>
+            {HEADERS.map((h) => (
+              <th
+                key={h}
+                className="px-4 py-3 text-[11px] font-semibold term-green term-glow uppercase tracking-widest whitespace-nowrap"
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>

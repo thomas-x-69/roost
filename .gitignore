@@ -46,6 +46,11 @@ logs/
 .env.local
 *.local
 
+# ─── Claude Code local state ─────────────────────────────────────────────────
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+.claude/settings.local.json
+
 # ─── Screenshots / scratch (regenerate as needed) ───────────────────────────
 *.png
 !docs/**/*.png

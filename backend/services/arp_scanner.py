@@ -87,10 +87,19 @@ def arp_scan(
     own_ip: str = "",
     own_mac: str = "",
     timeout: float = 2.0,
+    rounds: int = 2,
 ) -> list[ScannedDevice]:
     """
     Perform ARP scan on the given network CIDR.
     Returns list of responding devices.
+
+    RELIABILITY FIX: devices in Wi-Fi power-save mode frequently miss a single
+    ARP request and so appear "offline" for a scan. To compensate we send
+    several ARP request rounds (``rounds``) and union the answers. A device
+    only has to answer ONE round to be counted present. Each round uses its own
+    ``timeout`` window; total work stays bounded at roughly ``rounds * timeout``
+    seconds (e.g. 2 rounds * 3s = ~6s worst case), so a scan still finishes in a
+    few seconds and well within the 30s scheduler interval.
     """
     try:
         from scapy.layers.l2 import Ether, ARP
@@ -131,7 +140,15 @@ def arp_scan(
             if resolved_iface is not None:
                 kwargs["iface"] = resolved_iface
 
-            answered, _ = srp(packet, **kwargs)
+            # Send several ARP request rounds and union the answers. Quiet /
+            # power-save devices that miss one round usually answer a later one.
+            # Keyed by IP so we keep the latest MAC seen for each responder and
+            # avoid duplicate entries across rounds.
+            seen: dict[str, str] = {}  # ip -> normalized mac
+            for _round in range(max(1, rounds)):
+                answered, _ = srp(packet, **kwargs)
+                for _, recv in answered:
+                    seen[recv.psrc] = normalize_mac(recv.hwsrc)
         finally:
             try:
                 scapy_conf.iface = old_iface
@@ -139,7 +156,7 @@ def arp_scan(
                 pass
 
         # Collect ARP results first, then resolve hostnames in parallel
-        raw = [(normalize_mac(recv.hwsrc), recv.psrc) for _, recv in answered]
+        raw = [(mac, ip) for ip, mac in seen.items()]
         ips = [ip for _, ip in raw]
         hostnames = _bulk_reverse_dns(ips, timeout=2.0)
 

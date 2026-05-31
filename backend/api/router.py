@@ -7,6 +7,7 @@ from backend.api.alerts import router as alerts_router
 from backend.api.groups import router as groups_router
 from backend.api.threats import router as threats_router
 from backend.api.reports import router as reports_router
+from backend.api.diagnostics import router as diagnostics_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(devices_router)
@@ -17,3 +18,4 @@ api_router.include_router(alerts_router)
 api_router.include_router(groups_router)
 api_router.include_router(threats_router)
 api_router.include_router(reports_router)
+api_router.include_router(diagnostics_router)

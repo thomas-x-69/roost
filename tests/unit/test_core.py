@@ -72,6 +72,18 @@ class TestDeviceClassifier:
         assert classify_device("Totally Unknown Vendor Co")[0] == "unknown"
 
 
+class TestMacValidation:
+    def test_valid_and_invalid_macs(self):
+        from backend.services.arp_spoofer import _is_valid_mac
+        assert _is_valid_mac("48:E7:DA:C3:0A:FB")
+        assert _is_valid_mac("aa-bb-cc-dd-ee-ff")
+        assert not _is_valid_mac("")
+        assert not _is_valid_mac("00:00:00:00:00:00")
+        assert not _is_valid_mac("ff:ff:ff:ff:ff:ff")
+        assert not _is_valid_mac("GG:GG:GG:GG:GG:GG")  # 6 groups but not hex
+        assert not _is_valid_mac("not a mac")
+
+
 class TestFormatBytes:
     def test_units(self):
         assert _format_bytes(512) == "512 B"

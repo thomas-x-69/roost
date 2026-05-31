@@ -142,6 +142,31 @@ def _check_npcap() -> bool:
             return False
 
 
+def is_ip_forwarding_enabled() -> Optional[bool]:
+    """
+    True if Windows global IP forwarding (IPEnableRouter) is ON, False if OFF,
+    None if unknown / not Windows.
+
+    This matters for device blocking: our ARP "cut" works by making the host the
+    sink for the target's traffic and NOT forwarding it. If the host has IP
+    forwarding enabled (ICS / RRAS / manual IPEnableRouter=1), it would instead
+    forward that traffic — turning the block into a transparent MITM and leaving
+    the target with full internet. Surfaced in /diagnostics/blocking.
+    """
+    try:
+        import winreg
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",
+        ) as key:
+            val, _ = winreg.QueryValueEx(key, "IPEnableRouter")
+            return bool(val)
+    except FileNotFoundError:
+        return False  # value absent => Windows default is "off"
+    except Exception:
+        return None  # non-Windows or registry unreadable
+
+
 def get_network_info() -> NetworkInfo:
     global _cached_info
     if _cached_info:

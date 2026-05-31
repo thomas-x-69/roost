@@ -24,10 +24,11 @@ async def blocking_diagnostics():
     reasons when blocking is unavailable.
     """
     from backend.utils.admin_check import check_admin
-    from backend.services.network_info import get_network_info
+    from backend.services.network_info import get_network_info, is_ip_forwarding_enabled
 
     is_admin = check_admin()
     net = get_network_info()
+    forwarding_enabled = is_ip_forwarding_enabled()
 
     invalid_mac = (not net.own_mac) or net.own_mac.lower() in (
         "00:00:00:00:00:00",
@@ -66,6 +67,12 @@ async def blocking_diagnostics():
         reasons.append("Default gateway could not be detected")
     elif gateway_mac is None:
         reasons.append("Gateway MAC could not be resolved")
+    if forwarding_enabled:
+        reasons.append(
+            "Host IP forwarding is ON — traffic would be forwarded instead of "
+            "blocked. Disable it (set IPEnableRouter=0 / stop Internet Connection "
+            "Sharing) and reboot."
+        )
 
     can_block = len(reasons) == 0
 
@@ -78,6 +85,7 @@ async def blocking_diagnostics():
         "own_mac": net.own_mac,
         "gateway_ip": net.gateway_ip,
         "gateway_mac": gateway_mac,
+        "ip_forwarding_enabled": forwarding_enabled,
         "can_block": can_block,
         "reasons": reasons,
     }

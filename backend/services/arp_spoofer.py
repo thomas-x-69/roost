@@ -18,6 +18,7 @@ would otherwise let the target's cache self-heal.
 CRITICAL: stop_spoof()/stop_all_spoofs() must be called on shutdown to restore
 BOTH ARP caches, otherwise the target and the gateway stay poisoned.
 """
+import re
 import threading
 import time
 import logging
@@ -25,6 +26,8 @@ from typing import Dict
 from backend.utils.mac_utils import normalize_mac
 
 logger = logging.getLogger("roost.arp_spoofer")
+
+_MAC_RE = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
 # Active spoof threads: mac_address -> (thread, stop_event)
 _active: Dict[str, tuple] = {}
@@ -45,9 +48,9 @@ def _is_valid_mac(mac: str) -> bool:
     norm = normalize_mac(mac or "")
     if norm in _INVALID_MACS:
         return False
-    # normalize_mac returns AA:BB:... only when it parsed 12 hex digits.
-    parts = norm.split(":")
-    return len(parts) == 6 and all(len(p) == 2 for p in parts)
+    # Require six hex octets — normalize_mac passes through unparseable input,
+    # so a plain group-count check would accept junk like 'GG:GG:...'.
+    return bool(_MAC_RE.match(norm))
 
 
 def _scapy_mac(mac: str) -> str:
@@ -178,78 +181,92 @@ def start_spoof(target_ip: str, target_mac: str) -> bool:
     blocking Scapy I/O which must not run on the async event loop.
     """
     mac = normalize_mac(target_mac)
+    # Fast optimistic check — but do NOT hold the lock across the blocking
+    # gateway-MAC resolution below, or a concurrent unblock / shutdown restore
+    # would stall behind a ~3s srp() and the dual ARP restore could be skipped.
     with _lock:
         if mac in _active:
             logger.debug(f"Already spoofing {mac}")
             return True
 
-        try:
-            from backend.services.network_info import get_network_info
-            from backend.services.arp_scanner import _resolve_scapy_iface
-            net = get_network_info()
+    try:
+        from backend.services.network_info import (
+            get_network_info, is_ip_forwarding_enabled,
+        )
+        from backend.services.arp_scanner import _resolve_scapy_iface
+        net = get_network_info()
 
-            # Safety: never spoof the gateway or our own device.
-            if target_ip == net.gateway_ip or target_ip == net.own_ip:
-                logger.warning(f"Refusing to spoof gateway/own IP: {target_ip}")
-                return False
+        # Safety: never spoof the gateway or our own device.
+        if target_ip == net.gateway_ip or target_ip == net.own_ip:
+            logger.warning(f"Refusing to spoof gateway/own IP: {target_ip}")
+            return False
 
-            # Our own MAC must be a real, valid MAC or every Ether src is junk.
-            if not _is_valid_mac(net.own_mac):
-                logger.error(
-                    f"Cannot start spoof for {target_ip}: own MAC is invalid "
-                    f"({net.own_mac!r}) — interface detection failed"
-                )
-                return False
+        # Our own MAC must be a real, valid MAC or every Ether src is junk.
+        if not _is_valid_mac(net.own_mac):
+            logger.error(
+                f"Cannot start spoof for {target_ip}: own MAC is invalid "
+                f"({net.own_mac!r}) — interface detection failed"
+            )
+            return False
 
-            # Target MAC must be valid too (it is our L2 destination).
-            if not _is_valid_mac(mac):
-                logger.error(
-                    f"Cannot start spoof: target MAC is invalid ({target_mac!r})"
-                )
-                return False
+        # Target MAC must be valid too (it is our L2 destination).
+        if not _is_valid_mac(mac):
+            logger.error(f"Cannot start spoof: target MAC is invalid ({target_mac!r})")
+            return False
 
-            # Resolve the correct Scapy interface object (same logic as scanner).
-            resolved_iface = _resolve_scapy_iface(net.interface, net.own_ip)
-            if resolved_iface is None:
-                logger.error(
-                    f"Cannot start spoof for {target_ip}: no usable network "
-                    f"interface resolved for {net.interface}/{net.own_ip}"
-                )
-                return False
+        # Resolve the correct Scapy interface OBJECT (never a bare string now).
+        resolved_iface = _resolve_scapy_iface(net.interface, net.own_ip)
+        if resolved_iface is None:
+            logger.error(
+                f"Cannot start spoof for {target_ip}: no usable network "
+                f"interface resolved for {net.interface}/{net.own_ip}"
+            )
+            return False
 
-            # Resolve and VERIFY the gateway MAC before starting.
-            gateway_mac = _get_mac(net.gateway_ip, resolved_iface,
-                                   own_mac=net.own_mac)
-            if not _is_valid_mac(gateway_mac):
-                logger.error(
-                    f"Cannot get gateway MAC for {net.gateway_ip} "
-                    f"(got {gateway_mac!r}) — ensure Npcap is installed, the "
-                    "correct interface is selected, and Roost runs as "
-                    "Administrator. Aborting block."
-                )
-                return False
-
-            logger.info(
-                f"Starting bidirectional ARP spoof for {target_ip}/{mac}: "
-                f"gateway {net.gateway_ip}/{gateway_mac}, our mac {net.own_mac}, "
-                f"iface {resolved_iface}"
+        # If host IP forwarding is ON, our "cut" would actually forward the
+        # target's traffic (MITM, not block). Warn loudly; diagnostics flags it.
+        if is_ip_forwarding_enabled():
+            logger.warning(
+                "Host IP forwarding is ENABLED — the block may NOT cut internet "
+                "(traffic would be forwarded). Disable IPEnableRouter / ICS."
             )
 
-            stop_event = threading.Event()
-            thread = threading.Thread(
-                target=_spoof_loop,
-                args=(target_ip, mac, net.gateway_ip, gateway_mac,
-                      net.own_mac, resolved_iface, stop_event),
-                daemon=True,
-                name=f"spoof-{mac}",
+        # Resolve and VERIFY the gateway MAC before starting (blocking I/O).
+        gateway_mac = _get_mac(net.gateway_ip, resolved_iface, own_mac=net.own_mac)
+        if not _is_valid_mac(gateway_mac):
+            logger.error(
+                f"Cannot get gateway MAC for {net.gateway_ip} (got {gateway_mac!r}) "
+                "— ensure Npcap is installed, the correct interface is selected, "
+                "and Roost runs as Administrator. Aborting block."
             )
+            return False
+
+        logger.info(
+            f"Starting bidirectional ARP spoof for {target_ip}/{mac}: "
+            f"gateway {net.gateway_ip}/{gateway_mac}, our mac {net.own_mac}, "
+            f"iface {resolved_iface}"
+        )
+
+        stop_event = threading.Event()
+        thread = threading.Thread(
+            target=_spoof_loop,
+            args=(target_ip, mac, net.gateway_ip, gateway_mac,
+                  net.own_mac, resolved_iface, stop_event),
+            daemon=True,
+            name=f"spoof-{mac}",
+        )
+        # Re-acquire the lock only to commit; bail if another caller won the race.
+        with _lock:
+            if mac in _active:
+                logger.debug(f"Race: already spoofing {mac}")
+                return True
             thread.start()
             _active[mac] = (thread, stop_event)
-            logger.info(f"ARP spoof started: {mac} @ {target_ip}")
-            return True
-        except Exception as e:
-            logger.error(f"start_spoof failed: {e}", exc_info=True)
-            return False
+        logger.info(f"ARP spoof started: {mac} @ {target_ip}")
+        return True
+    except Exception as e:
+        logger.error(f"start_spoof failed: {e}", exc_info=True)
+        return False
 
 
 def stop_spoof(target_mac: str) -> bool:
@@ -275,7 +292,8 @@ def stop_all_spoofs():
 
 def is_spoofing(target_mac: str) -> bool:
     mac = normalize_mac(target_mac)
-    return mac in _active
+    with _lock:
+        return mac in _active
 
 
 def _get_mac(ip: str, iface, own_mac: str = "") -> str:

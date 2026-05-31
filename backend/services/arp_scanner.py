@@ -76,9 +76,15 @@ def _resolve_scapy_iface(interface_name: str, own_ip: str = ""):
     except Exception as e:
         logger.warning(f"Interface resolution failed: {e}")
 
-    # Last resort: return name string and let Scapy try its own resolution
-    logger.warning(f"Could not resolve Scapy interface for '{interface_name}', using string fallback")
-    return interface_name or None
+    # No real Scapy NetworkInterface matched. Return None rather than a bare
+    # friendly-name string: a string fallback makes Scapy fall back to conf.iface
+    # (the Microsoft KM-TEST Loopback Adapter on Windows), so poison packets would
+    # egress nowhere. Callers (esp. the spoofer) must treat None as "abort".
+    logger.warning(
+        f"Could not resolve a real Scapy interface for '{interface_name}' "
+        f"(own_ip={own_ip!r}); returning None"
+    )
+    return None
 
 
 def arp_scan(
